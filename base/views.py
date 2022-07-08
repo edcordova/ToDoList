@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, FormView
 from django.views.generic import DetailView
-from .models import TaskList
+from .models import TaskList, WholeList
 from django.contrib.auth.views import LoginView
 from django.urls import reverse_lazy
 from django.contrib.auth import login
@@ -17,13 +17,13 @@ class Login(LoginView):
     redirect_authenticated_user = True 
 
     def get_success_url(self):
-        return reverse_lazy('home')
+        return reverse_lazy('home-room')
 
 class Register(FormView):
     form_class = UserCreationForm
     template_name = 'register.html'
     redirect_authenticated_user = True
-    success_url= reverse_lazy('home')
+    success_url= reverse_lazy('home-room')
 
     def form_valid(self,form):
         user=form.save()
@@ -33,30 +33,37 @@ class Register(FormView):
 
     def get(self, *args, **kwargs):
         if self.request.user.is_authenticated:
-            return redirect('home')
+            return redirect('home-room')
         return super(Register,self).get(*args, **kwargs)
         
     
   
 
 
-class Home(LoginRequiredMixin,ListView):
-    model = TaskList
-    context_object_name = 'tasks'
-    template_name = 'home.html'
+# class HomeRoom(LoginRequiredMixin,ListView):
+#     model = TaskList
+#     context_object_name = 'tasks'
+#     template_name = 'home-room.html'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['tasks'] = context['tasks'].filter(user=self.request.user)
-        context['count'] = context['tasks'].filter(completed=False).count()
+#     def get_context_data(self, **kwargs):
+#         context = super().get_context_data(**kwargs)
+#         print(context)
+#         context['tasks'] = context['tasks'].filter(user=self.request.user)
+#         context['count'] = context['tasks'].filter(completed=False).count()
         
-        search_input = self.request.GET.get('search-area') or ''
-        if search_input:
-            context['tasks'] = context['tasks'].filter(name__icontains=search_input)
+#         search_input = self.request.GET.get('search-area') or ''
+#         if search_input:
+#             context['tasks'] = context['tasks'].filter(name__icontains=search_input)
         
-        context['search_input']= search_input
+#         context['search_input']= search_input
         
-        return context
+#         return context
+
+class HomeRoom(LoginRequiredMixin,DetailView):
+    model = WholeList
+    template_name = 'home-room.html'
+    context_object_name = 'tasks'
+
 
 class TaskDetail(LoginRequiredMixin,DetailView):
     model = TaskList
@@ -66,7 +73,7 @@ class TaskDetail(LoginRequiredMixin,DetailView):
 class TaskCreate(LoginRequiredMixin,CreateView):
     model = TaskList
     fields = ['name', 'description', 'completed']
-    success_url= reverse_lazy('home')
+    success_url= reverse_lazy('home-room')
     template_name = 'tasklist_form.html'
 
     def form_valid(self,form):
@@ -76,13 +83,24 @@ class TaskCreate(LoginRequiredMixin,CreateView):
 class TaskEdit(LoginRequiredMixin,UpdateView):
     model = TaskList
     fields = ['name', 'description', 'completed']
-    success_url= reverse_lazy('home')
+    success_url= reverse_lazy('home-room')
     template_name = 'tasklist_form.html'
 
 class TaskDelete(LoginRequiredMixin,DeleteView):
     model = TaskList
-    success_url= reverse_lazy('home')
+    success_url= reverse_lazy('home-room')
     template_name = 'delete-task.html'
     context_object_name = 'task'
 
+# class ListSummary(LoginRequiredMixin,ListView):
+#     model = WholeList
+#     context_object_name = 'lists'
+#     template_name = 'list-summary.html'
 
+def ListSummary(request):
+    
+    rooms = WholeList.objects.all()
+    
+    # rooms = wholelist.tasklist_set.all()
+    context={'rooms':rooms}
+    return render(request,'list-summary.html', context)

@@ -4,9 +4,18 @@ from django.contrib.auth.models import User
 
 
 # Create your models here.
+class WholeList(models.Model):
+    host = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    name = models.CharField(max_length=250)
+
+    def __str__(self):
+        return self.name
+
+
 class TaskList(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=250)
+    taskinfo = models.ForeignKey(WholeList, on_delete=models.CASCADE, blank=False)
     description = models.TextField(null=True, blank=True)
     created = models.DateTimeField(auto_now_add=True)
     completed= models.BooleanField(default=False)

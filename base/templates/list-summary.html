@@ -1,0 +1,10 @@
+<!-- {% for list in lists %}
+{{list.name}} Hosted by {{list.host}}
+{% endfor %} -->
+
+{% for room in rooms %}
+    <div>
+        <a href="{% url 'home-room' room.id %}">{{room.name}} hosted by {{room.host}}</a>
+    </div>
+    
+    {% endfor %}

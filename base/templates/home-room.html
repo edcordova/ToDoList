@@ -30,7 +30,7 @@
 
 
 <div class="task-items-wrapper">
-    {% for task in tasks %}
+    {% for task in room.task_set.all %}
         <div class="task-wrapper">
             {% if task.completed %}
                 <div class="task-title">

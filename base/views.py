@@ -1,5 +1,6 @@
+from multiprocessing import context
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, FormView
 from django.views.generic import DetailView
 from .models import Task, TaskList
@@ -11,6 +12,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth.mixins import PermissionRequiredMixin
 
 from django.contrib.auth.forms import UserCreationForm
+from .forms import ParticipantsForm
+
+from django.contrib import messages
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 # Create your views here.
@@ -39,7 +43,7 @@ class Register(FormView):
             return redirect('home-room')
         return super(Register,self).get(*args, **kwargs)
         
-    
+
   
 
 
@@ -66,22 +70,50 @@ class HomeRoom(PermissionRequiredMixin,LoginRequiredMixin,DetailView):
     model = TaskList
     template_name = 'home-room.html'
     context_object_name = 'room'
+    
+
+    def get_context_data(self,*args, **kwargs):
+        context = super(HomeRoom, self).get_context_data(*args,**kwargs)
+        form = ParticipantsForm()
+        tasklist = self.get_object()
+        participants= tasklist.participants.all()
+        count = tasklist.task_set.all().count()   #contar por completadas, falta un filter
+        context['participants'] = participants
+        context['count'] = count
+        context['form'] = form
+        return context
+
 
     def get_permission_required(self):
         
         perms=[]
         tasklist = self.get_object()
         permission = Permission.objects.filter(codename=f'view_task_{tasklist.name}')
-        # ct=ContentType.objects.get(id=permission.content_type)
+          
         for perm in permission:
             applabel=perm.content_type.app_label
             perms.append(f'{applabel}.{perm.codename}')
         return perms
 
-class TaskDetail(LoginRequiredMixin,DetailView):
-    model = Task
-    template_name = 'details.html'
-    context_object_name = 'task'
+
+    def post(self, request, *args, **kwargs):
+        tasklist = self.get_object()
+        
+        group=Group.objects.get(name=f'{tasklist}_group')     
+        users = request.POST.get('users')
+        group.user_set.add(users)
+        tasklist.participants.add(users)
+        messages.success(request, 'Users add to Task List')
+        
+        return HttpResponseRedirect(self.request.path_info)
+
+
+# class TaskDetail(PermissionRequiredMixin,DetailView):
+#     model = Task
+#     template_name = 'details.html'
+#     context_object_name = 'task'
+
+
 
 class TaskCreate(LoginRequiredMixin,CreateView):
            
@@ -89,32 +121,87 @@ class TaskCreate(LoginRequiredMixin,CreateView):
     fields = ['name', 'description', 'completed', 'taskinfo']
     success_url= reverse_lazy('list-summary')
     template_name = 'task_form.html'
+    context_object_name = 'task'
     
-    
+
+    def get_context_data(self, **kwargs):
+        
+        if 'form' not in kwargs:
+            kwargs['form'] = self.get_form()
+        return super().get_context_data(**kwargs)                
+     
     def form_valid(self,form):
         form.instance.user = self.request.user
         return super(TaskCreate, self).form_valid(form)
 
+    
+
+    def post(self, request, *args, **kwargs):
+    
+        form = self.get_form()
+        if form.is_valid():
+            
+            permission=request.user.get_all_permissions()
+            tasklist_name=form.cleaned_data.get('taskinfo')
+            app_label = self.model._meta.app_label
+            permission_required = f'{app_label}.add_task_{tasklist_name}'
+            
+            
+            if permission_required in permission:
+                
+                           
+                return self.form_valid(form)
+            
+            else:
+                messages.success(request, 'You dont have permission to post on this Task List')
+        
+                return HttpResponseRedirect(self.request.path_info)
+        
+
    
 
-class TaskEdit(LoginRequiredMixin,UpdateView):
+class TaskEdit(PermissionRequiredMixin,UpdateView):
     model = Task
     fields = ['name', 'description', 'completed']
     success_url= reverse_lazy('list-summary')
     template_name = 'task_form.html'
+    context_object_name = 'task'
 
-class TaskDelete(LoginRequiredMixin,DeleteView):
+    def get_permission_required(self):
+    
+        perms=[]
+        task = self.get_object()
+        tasklist_name=task.taskinfo.name
+        permission = Permission.objects.filter(codename=f'view_task_{tasklist_name}')
+                
+        for perm in permission:
+            applabel=perm.content_type.app_label
+            perms.append(f'{applabel}.{perm.codename}')
+            
+        return perms
+
+class TaskDelete(PermissionRequiredMixin,LoginRequiredMixin,DeleteView):
     model = Task
     success_url= reverse_lazy('list-summary')
     template_name = 'delete-task.html'
     context_object_name = 'task'
 
-# class ListSummary(LoginRequiredMixin,ListView):
-#     model = TaskList
-#     context_object_name = 'lists'
-#     template_name = 'list-summary.html'
+    def get_permission_required(self):
 
-class ListSummary(ListView):
+        perms=[]
+        task = self.get_object()
+        tasklist_name=task.taskinfo.name
+        permission = Permission.objects.filter(codename=f'delete_task_{tasklist_name}')
+                
+        for perm in permission:
+            applabel=perm.content_type.app_label
+            perms.append(f'{applabel}.{perm.codename}')
+            
+        return perms
+
+
+
+class ListSummary(LoginRequiredMixin, ListView):
     
     model = TaskList
     template_name = 'list-summary.html'
@@ -152,6 +239,26 @@ class TaskListCreate(LoginRequiredMixin,CreateView):
     fields = ['name',]
     success_url= reverse_lazy('list-summary')
     template_name = 'tasklist_form.html'
+    
+    # def post(self, request, *args, **kwargs):
+    
+    #     form = self.get_form()
+    #     if form.is_valid and request.user.is_superuser:
+                                                      
+    #         return self.form_valid(form)
+    #     else:
+    #         messages.success(request, 'You dont have permission create a Task List')
+        
+    #         return HttpResponseRedirect(self.request.path_info)
+
+    def get(self, request, *args, **kwargs):
+        self.object = None
+        if request.user.is_superuser:
+            return super().get(request, *args, **kwargs)    
+        else:
+            messages.success(request, 'You dont have permission create a Task List')
+        
+            return HttpResponseRedirect(reverse_lazy('list-summary'))
 
         
     def form_valid(self,form):

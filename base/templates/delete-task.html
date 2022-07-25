@@ -1,18 +1,21 @@
 {%extends 'main.html'%}
 {% block content%}
 
-<div class="header-bar">
-    <a href="{% url 'home-room' %}">&#8592; Back</a>
-</div>
-
-
-<div class="card-body">
-    <form method="post">
-        {% csrf_token %}
-        <p>Are you sure you want to delete "{{ task }}"?</p>
-        {{ form.as_p }}
-        <input class="button" type="submit" value="Confirm">
-    </form>
+<div class="container">
+    <div class="header-bar">
+        <a href="{% url 'home-room' task.taskinfo.id %}">&#8592; Back</a>
+    </div>
+    
+    
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <p>Are you sure you want to delete "{{ task }}"?</p>
+            {{ form.as_p }}
+            <input class="button" type="submit" value="Confirm">
+        </form>
+    
+    </div>
 
 </div>
 

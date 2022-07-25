@@ -1,17 +1,28 @@
 {%extends 'main.html'%}
 {% block content%}
 
-<div class="header-bar">
-    <a href="{% url 'list-summary' %}">&#8592; Back</a>
+<div class="container" >
+    <div class="header-bar">
+        <a href="{{ request.META.HTTP_REFERER }}">&#8592; Back</a> 
+    </div>
+    
+    <div class="card-body" >
+        <form method= 'POST' action="">
+            {%csrf_token%}
+            {{form.as_p}}
+            <input class="button" type="submit" value="Submit">
+        </form>
+    </div>
+    
+
 </div>
 
-<div class="card-body" >
-    <form method= 'POST' action="">
-        {%csrf_token%}
-        {{form.as_p}}
-        <input class="button" type="submit" value="Submit">
-    </form>
-</div>
+{% if messages %}
+        {% for message in messages %}
+         {% if message.tags %}  <script>alert("{{ message }}")</script> {% endif %}
 
+        {% endfor %}
+
+    {% endif %}
 
 {% endblock content%}

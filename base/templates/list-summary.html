@@ -1,16 +1,29 @@
-<!-- {% for list in lists %}
-{{list.name}} Hosted by {{list.host}}
-{% endfor %} -->
+{%extends 'main.html'%}
 
-
-
-<a href="{% url 'tasklist-create' %}">Create new tasklist</a>
-<hr>
-{% for room in rooms %}
-
-    <div>
-        <a href="{% url 'home-room' room.id %}">{{room.name}} hosted by {{room.host}}</a>
+{% block content %}
+<div class="container">
+    <div class="header-bar">
+        <h1> Welcome {{request.user}}</h1>
     </div>
+    <div class="card-body">
     
-    {% endfor %}
+    <div class="task-items-wrapper">
+    <a href="{% url 'tasklist-create' %}">Create new tasklist</a>
     
+    
+    {% for room in rooms %}
+    
+        <div class="task-wrapper">
+            <div class="task-title">
+            <a href="{% url 'home-room' room.id %}">{{room.name}} hosted by {{room.host}}</a>
+            </div>
+        </div>
+        
+        {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+
+{% endblock content %}

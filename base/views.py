@@ -5,7 +5,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView, F
 from django.views.generic import DetailView
 from .models import Task, TaskList
 from django.contrib.auth.views import LoginView
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.contrib.auth import login
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
@@ -47,24 +47,6 @@ class Register(FormView):
   
 
 
-# class HomeRoom(LoginRequiredMixin,ListView):
-#     model = Task
-#     context_object_name = 'tasks'
-#     template_name = 'home-room.html'
-
-#     def get_context_data(self, **kwargs):
-#         context = super().get_context_data(**kwargs)
-#         print(context)
-#         context['tasks'] = context['tasks'].filter(taskinfo__id=self.request.resolver_match.kwargs.get('pk'))
-#         context['count'] = context['tasks'].filter(completed=False).count()
-        
-#         search_input = self.request.GET.get('search-area') or ''
-#         if search_input:
-#             context['tasks'] = context['tasks'].filter(name__icontains=search_input)
-        
-#         context['search_input']= search_input
-        
-#         return context
 
 class HomeRoom(PermissionRequiredMixin,LoginRequiredMixin,DetailView):
     model = TaskList
@@ -77,10 +59,19 @@ class HomeRoom(PermissionRequiredMixin,LoginRequiredMixin,DetailView):
         form = ParticipantsForm()
         tasklist = self.get_object()
         participants= tasklist.participants.all()
-        count = tasklist.task_set.all().count()   #contar por completadas, falta un filter
+        count = tasklist.task_set.filter(completed=False).count()  
         context['participants'] = participants
         context['count'] = count
         context['form'] = form
+        search_input = self.request.GET.get('search-area') or ''
+        rooms=tasklist.task_set.all()
+        if search_input != '':
+            rooms = rooms.filter(
+                name__icontains=search_input)
+            
+        context['rooms']=rooms
+            
+               
         return context
 
 
@@ -108,62 +99,51 @@ class HomeRoom(PermissionRequiredMixin,LoginRequiredMixin,DetailView):
         return HttpResponseRedirect(self.request.path_info)
 
 
-# class TaskDetail(PermissionRequiredMixin,DetailView):
-#     model = Task
-#     template_name = 'details.html'
-#     context_object_name = 'task'
-
-
 
 class TaskCreate(LoginRequiredMixin,CreateView):
            
     model = Task
-    fields = ['name', 'description', 'completed', 'taskinfo']
+    fields = ['name', 'description', 'completed']
     success_url= reverse_lazy('list-summary')
     template_name = 'task_form.html'
     context_object_name = 'task'
-    
-
-    def get_context_data(self, **kwargs):
-        
-        if 'form' not in kwargs:
-            kwargs['form'] = self.get_form()
-        return super().get_context_data(**kwargs)                
      
-    def form_valid(self,form):
+    def form_valid(self,form,**kwargs):
         form.instance.user = self.request.user
-        return super(TaskCreate, self).form_valid(form)
+        tasklist_id=kwargs.get('pk')
+        form.instance.taskinfo = TaskList.objects.get(id=tasklist_id)
+        self.object = form.save()
+        return HttpResponseRedirect(self.get_success_url(**kwargs))
 
     
-
     def post(self, request, *args, **kwargs):
-    
         form = self.get_form()
+        
         if form.is_valid():
             
             permission=request.user.get_all_permissions()
-            tasklist_name=form.cleaned_data.get('taskinfo')
+            tasklist_id=kwargs.get('pk')
+            tasklist_name=TaskList.objects.get(id=tasklist_id).name
+            
             app_label = self.model._meta.app_label
             permission_required = f'{app_label}.add_task_{tasklist_name}'
             
             
-            if permission_required in permission:
-                
-                           
-                return self.form_valid(form)
+            if permission_required in permission:        
+                return self.form_valid(form,**kwargs)
             
             else:
                 messages.success(request, 'You dont have permission to post on this Task List')
-        
                 return HttpResponseRedirect(self.request.path_info)
-        
 
-   
+    def get_success_url(self, **kwargs): 
+        tasklist_id=kwargs.get('pk')
+        return reverse_lazy('home-room', kwargs={'pk':tasklist_id})
 
+    
 class TaskEdit(PermissionRequiredMixin,UpdateView):
     model = Task
     fields = ['name', 'description', 'completed']
-    success_url= reverse_lazy('list-summary')
     template_name = 'task_form.html'
     context_object_name = 'task'
 
@@ -180,11 +160,24 @@ class TaskEdit(PermissionRequiredMixin,UpdateView):
             
         return perms
 
+    def get_success_url(self, **kwargs): 
+        task=self.get_object()  
+        tasklist=task.taskinfo.id   
+                       
+        return reverse_lazy('home-room', kwargs = {'pk': tasklist})
+
 class TaskDelete(PermissionRequiredMixin,LoginRequiredMixin,DeleteView):
     model = Task
-    success_url= reverse_lazy('list-summary')
+    
     template_name = 'delete-task.html'
     context_object_name = 'task'
+
+    def get_success_url(self, **kwargs): 
+        task=self.get_object()  
+        tasklist=task.taskinfo.id   
+        
+        return reverse_lazy('home-room', kwargs = {'pk': tasklist})
+        
 
     def get_permission_required(self):
 
@@ -240,17 +233,6 @@ class TaskListCreate(LoginRequiredMixin,CreateView):
     success_url= reverse_lazy('list-summary')
     template_name = 'tasklist_form.html'
     
-    # def post(self, request, *args, **kwargs):
-    
-    #     form = self.get_form()
-    #     if form.is_valid and request.user.is_superuser:
-                                                      
-    #         return self.form_valid(form)
-    #     else:
-    #         messages.success(request, 'You dont have permission create a Task List')
-        
-    #         return HttpResponseRedirect(self.request.path_info)
-
     def get(self, request, *args, **kwargs):
         self.object = None
         if request.user.is_superuser:
@@ -260,7 +242,7 @@ class TaskListCreate(LoginRequiredMixin,CreateView):
         
             return HttpResponseRedirect(reverse_lazy('list-summary'))
 
-        
+            
     def form_valid(self,form):
         form.instance.host = self.request.user
         new_group, created = Group.objects.get_or_create(name=f'{form.instance.name}_group')
@@ -270,7 +252,36 @@ class TaskListCreate(LoginRequiredMixin,CreateView):
             permission = Permission.objects.create(codename=f'{perm}_{form.instance.name}',
                                    name=f'Can {perm} {form.instance.name}',
                                    content_type=ct)
-            # tasklist_perm = Permission.objects.get(codename='add_task')
+            
             new_group.permissions.add(permission)
         return super(TaskListCreate, self).form_valid(form)
+    
+class TaskListDelete(PermissionRequiredMixin,LoginRequiredMixin,DeleteView):
+    model =  TaskList
+    template_name = 'tasklist-delete.html'
+    context_object_name = 'tasklist'
+    success_url= reverse_lazy('list-summary')
+
+    def get_permission_required(self):
+
+        perms=[]
+        tasklist = self.get_object()
+        
+        permission = Permission.objects.filter(codename=f'delete_task_{tasklist.name}')
+                
+        for perm in permission:
+            applabel=perm.content_type.app_label
+            perms.append(f'{applabel}.{perm.codename}')
+            
+        return perms
+
+    def form_valid(self, form):
+        success_url = self.get_success_url()
+        group = Group.objects.get(name=f'{self.object.name}_group')
+        group.permissions.all().delete()
+        group.delete()
+        
+        self.object.delete()
+        return HttpResponseRedirect(success_url)
+
     

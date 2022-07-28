@@ -1,0 +1,23 @@
+{%extends 'main.html'%}
+{% block content%}
+
+<div class="container">
+    <div class="header-bar">
+        <a href="{% url 'list-summary' %}">&#8592; Back</a>
+    </div>
+    
+    
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <p>Are you sure you want to delete "{{ tasklist }}"?</p>
+            {{ form.as_p }}
+            <input class="button" type="submit" value="Confirm">
+        </form>
+    
+    </div>
+
+</div>
+
+
+{% endblock content%}

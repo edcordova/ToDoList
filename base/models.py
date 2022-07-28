@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 # Create your models here.
 class TaskList(models.Model):
     host = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
-    name = models.CharField(max_length=250)
+    name = models.CharField(max_length=250, unique=True)
     participants=models.ManyToManyField(User, related_name='participants')
 
     def __str__(self):
